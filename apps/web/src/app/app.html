@@ -1,1 +1,21 @@
-<router-outlet />
+<a class="skip-link" href="#main">Skip to content</a>
+<mat-toolbar class="toolbar" role="banner">
+  <span class="brand">Restaurant</span>
+  <nav aria-label="Main">
+    @for (link of links; track link.path) {
+    <a [routerLink]="link.path" routerLinkActive="active" ariaCurrentWhenActive="page"
+      >{{ link.label }}</a
+    >
+    }
+  </nav>
+  <span class="spacer"></span>
+  <span class="live" [attr.data-health]="connection.health()">
+    <span class="dot" aria-hidden="true"></span>
+    @switch (connection.health()) { @case ('ok') { Live } @case ('offline') { Offline } @default {
+    Connecting } }
+  </span>
+</mat-toolbar>
+<main id="main" tabindex="-1">
+  <router-outlet />
+</main>
+<app-connection-banner />

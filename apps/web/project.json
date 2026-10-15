@@ -21,14 +21,20 @@
             "input": "apps/web/public"
           }
         ],
-        "styles": ["apps/web/src/styles.scss"]
+        "styles": [
+          "apps/web/src/styles.scss",
+          "node_modules/@fontsource/material-icons/latin-400.css"
+        ],
+        "stylePreprocessorOptions": {
+          "includePaths": ["libs/web/ui/src/styles"]
+        }
       },
       "configurations": {
         "production": {
           "budgets": [
             {
               "type": "initial",
-              "maximumWarning": "500kb",
+              "maximumWarning": "650kb",
               "maximumError": "1mb"
             },
             {
