@@ -1,6 +1,6 @@
 import type { Order, ServerEvent } from '@restaurant/contracts';
-import { EventBus } from '../realtime/event-bus';
-import type { OrdersService } from '../services/orders.service';
+import { EventBus } from '../events/event-bus';
+import type { OrderService } from './order.service';
 import { OrderSimulator } from './order-simulator';
 
 const order = (status: Order['status']): Order => ({
@@ -26,7 +26,7 @@ describe('OrderSimulator', () => {
       bus.publish({ type: 'order.updated', order: updated } satisfies ServerEvent);
       return updated;
     });
-    const simulator = new OrderSimulator({ transition } as unknown as OrdersService, stepMs, {
+    const simulator = new OrderSimulator({ transition } as unknown as OrderService, stepMs, {
       warn: jest.fn(),
     });
     simulator.attach(bus);

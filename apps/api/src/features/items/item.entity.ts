@@ -1,7 +1,12 @@
-import { ITEM_DESCRIPTION_MAX, ITEM_NAME_MAX, MAX_PRICE_CENTS } from '@restaurant/contracts';
+import {
+  ITEM_DESCRIPTION_MAX,
+  ITEM_NAME_MAX,
+  MAX_PRICE_CENTS,
+  type MenuItem,
+} from '@restaurant/contracts';
 import { model, Schema, type Types } from 'mongoose';
 
-export interface MenuItemDoc {
+export interface ItemDoc {
   _id: Types.ObjectId;
   categoryId: Types.ObjectId;
   name: string;
@@ -14,7 +19,7 @@ export interface MenuItemDoc {
   updatedAt: Date;
 }
 
-const menuItemSchema = new Schema<MenuItemDoc>(
+const itemSchema = new Schema<ItemDoc>(
   {
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
     name: { type: String, required: true, trim: true, maxlength: ITEM_NAME_MAX },
@@ -27,11 +32,11 @@ const menuItemSchema = new Schema<MenuItemDoc>(
   { timestamps: true },
 );
 
-menuItemSchema.index({ categoryId: 1, sortOrder: 1 });
-menuItemSchema.index({ name: 'text' });
+itemSchema.index({ categoryId: 1, sortOrder: 1 });
+itemSchema.index({ name: 'text' });
 
 // Invariant: a price exists if and only if the item is not open-price.
-menuItemSchema.pre('validate', function () {
+itemSchema.pre('validate', function () {
   if (this.openPrice && this.priceCents !== null && this.priceCents !== undefined) {
     this.invalidate('priceCents', 'Open-price items must not have a price');
   }
@@ -40,4 +45,18 @@ menuItemSchema.pre('validate', function () {
   }
 });
 
-export const MenuItemModel = model<MenuItemDoc>('MenuItem', menuItemSchema, 'menu_items');
+export const ItemModel = model<ItemDoc>('MenuItem', itemSchema, 'menu_items');
+
+export function toMenuItem(doc: ItemDoc): MenuItem {
+  const base = {
+    id: doc._id.toHexString(),
+    categoryId: doc.categoryId.toHexString(),
+    name: doc.name,
+    available: doc.available,
+    sortOrder: doc.sortOrder,
+    ...(doc.description ? { description: doc.description } : {}),
+  };
+  return doc.openPrice
+    ? { ...base, openPrice: true, priceCents: null }
+    : { ...base, openPrice: false, priceCents: doc.priceCents as number };
+}

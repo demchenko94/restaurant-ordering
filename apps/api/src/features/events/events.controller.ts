@@ -12,8 +12,13 @@ function frame({ id, event }: StampedEvent): string {
  * `GET /api/events`. Replays missed events when the client reconnects with `Last-Event-ID`,
  * or tells it to reload (`resync`) when that is impossible.
  */
-export function sseHandler(bus: EventBus, heartbeatMs = HEARTBEAT_MS) {
-  return (req: Request, res: Response): void => {
+export class EventsController {
+  constructor(
+    private readonly bus: EventBus,
+    private readonly heartbeatMs = HEARTBEAT_MS,
+  ) {}
+
+  stream = (req: Request, res: Response): void => {
     res.status(200).set({
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
@@ -33,11 +38,11 @@ export function sseHandler(bus: EventBus, heartbeatMs = HEARTBEAT_MS) {
       lastSent = seq;
       res.write(frame(stamped));
     };
-    const unsubscribe = bus.subscribe(send);
+    const unsubscribe = this.bus.subscribe(send);
 
     const lastEventId = req.header('last-event-id');
     if (lastEventId) {
-      const replay = bus.replaySince(lastEventId);
+      const replay = this.bus.replaySince(lastEventId);
       if (replay.kind === 'resync') {
         res.write(`event: resync\ndata: ${JSON.stringify({ type: 'resync' })}\n\n`);
       } else {
@@ -45,7 +50,7 @@ export function sseHandler(bus: EventBus, heartbeatMs = HEARTBEAT_MS) {
       }
     }
 
-    const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), heartbeatMs);
+    const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), this.heartbeatMs);
     heartbeat.unref();
 
     req.on('close', () => {

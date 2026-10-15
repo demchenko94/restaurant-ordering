@@ -1,4 +1,4 @@
-import { CATEGORY_NAME_MAX } from '@restaurant/contracts';
+import { CATEGORY_NAME_MAX, type Category } from '@restaurant/contracts';
 import { model, Schema, type Types } from 'mongoose';
 
 export interface CategoryDoc {
@@ -20,3 +20,7 @@ const categorySchema = new Schema<CategoryDoc>(
 );
 
 export const CategoryModel = model<CategoryDoc>('Category', categorySchema, 'categories');
+
+export function toCategory(doc: CategoryDoc): Category {
+  return { id: doc._id.toHexString(), name: doc.name, sortOrder: doc.sortOrder };
+}

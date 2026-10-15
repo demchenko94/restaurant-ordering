@@ -5,12 +5,12 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
-import { errorHandler, notFoundHandler, requestId } from './http/middleware';
-import { createApiRouter, type Services } from './http/routes';
+import { createApiRouter, type ApiServices } from './api.router';
+import { errorHandler, notFoundHandler, requestId } from './common/middleware';
 import { mountDocs } from './openapi/docs';
 
 export interface AppOptions {
-  services: Services;
+  services: ApiServices;
   logger: Logger;
   corsOrigin?: string;
 }

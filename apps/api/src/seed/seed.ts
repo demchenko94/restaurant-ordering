@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
-import { CategoryModel } from '../persistence/models/category.model';
-import { CounterModel } from '../persistence/models/counter.model';
-import { MenuItemModel } from '../persistence/models/menu-item.model';
+import { CounterModel } from '../database/counter.entity';
+import { CategoryModel } from '../features/categories/category.entity';
+import { ItemModel } from '../features/items/item.entity';
 
 const CATEGORIES: Record<string, string[]> = {
   Pizza: ['Margherita', 'Pepperoni', 'Quattro Formaggi', 'Diavola', 'Capricciosa', 'Funghi'],
@@ -52,11 +52,7 @@ export async function seedMenu(
 ): Promise<number> {
   if (onlyIfEmpty && (await CategoryModel.estimatedDocumentCount()) > 0) return 0;
 
-  await Promise.all([
-    CategoryModel.deleteMany({}),
-    MenuItemModel.deleteMany({}),
-    CounterModel.deleteOne({ _id: 'menuRevision' }),
-  ]);
+  await Promise.all([CategoryModel.deleteMany({}), ItemModel.deleteMany({})]);
 
   const random = mulberry32(42);
   const categoryNames = Object.keys(CATEGORIES);
@@ -87,8 +83,9 @@ export async function seedMenu(
     }
   }
   for (let i = 0; i < items.length; i += 1000) {
-    await MenuItemModel.insertMany(items.slice(i, i + 1000), { ordered: false });
+    await ItemModel.insertMany(items.slice(i, i + 1000), { ordered: false });
   }
-  await CounterModel.updateOne({ _id: 'menuRevision' }, { $set: { seq: 1 } }, { upsert: true });
+  // Bump, never reset: revisions must stay monotonic so connected clients notice the change.
+  await CounterModel.updateOne({ _id: 'menuRevision' }, { $inc: { seq: 1 } }, { upsert: true });
   return items.length;
 }

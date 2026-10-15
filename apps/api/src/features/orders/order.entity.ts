@@ -1,4 +1,4 @@
-import { ORDER_STATUS_TRANSITIONS, type OrderStatus } from '@restaurant/contracts';
+import { ORDER_STATUS_TRANSITIONS, type Order, type OrderStatus } from '@restaurant/contracts';
 import { model, Schema, type Types } from 'mongoose';
 
 export interface OrderLineDoc {
@@ -66,3 +66,24 @@ orderSchema.index({ createdAt: -1, _id: -1 });
 orderSchema.index({ status: 1 });
 
 export const OrderModel = model<OrderDoc>('Order', orderSchema, 'orders');
+
+export function toOrder(doc: OrderDoc): Order {
+  return {
+    id: doc._id.toHexString(),
+    number: doc.number,
+    status: doc.status,
+    lines: doc.lines.map((l) => ({
+      itemId: l.itemId.toHexString(),
+      name: l.name,
+      categoryName: l.categoryName,
+      unitPriceCents: l.unitPriceCents,
+      quantity: l.quantity,
+      openPrice: l.openPrice,
+    })),
+    subtotalCents: doc.subtotalCents,
+    discountCents: doc.discountCents,
+    totalCents: doc.totalCents,
+    createdAt: doc.createdAt.toISOString(),
+    updatedAt: doc.updatedAt.toISOString(),
+  };
+}

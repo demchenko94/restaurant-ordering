@@ -567,31 +567,46 @@ until checkout.
 
 ## 9. Server structure
 
+Flat structure **by feature**: everything one feature needs lives in one folder, with one file per
+role and no sub-folders.
+
 ```
 apps/api/src/
-  main.ts                  bootstrap, graceful shutdown
-  app.ts                   express app factory (testable with supertest)
-  config/env.ts            Zod-validated environment
-  http/
-    middleware/            request-id, logger (pino-http), validate(zod), error-handler
-    routes/                menu.routes, checkout.routes, orders.routes, events.routes, docs.routes
-  domain/
-    quote.ts               buildQuote – pure, unit-tested
-    order-status.ts        transition table
-    money.ts
-  persistence/
-    models/                category.model, menu-item.model, order.model, counter.model
-    repositories/
-  realtime/
-    event-bus.ts           publish + ring buffer
-    sse.controller.ts
-  simulator/order-simulator.ts
-  openapi/registry.ts      zod-to-openapi registration, builds /openapi.json
-  seed/seed.ts             3–5k items for the large-menu scenario
+  main.ts                    bootstrap, seeding, graceful shutdown
+  app.ts                     Express app factory (middleware, docs, /api router)
+  api.router.ts              mounts every feature router under /api
+  container.ts               composition root: repositories → services
+  config/env.ts              Zod-validated environment
+  common/                    errors, parse, middleware, hash, serial-queue, mongo helpers
+  database/                  counter.entity, counter.repository (menuRevision, orderNumber)
+  features/
+    categories/              category.{router,controller,service,repository,entity}.ts
+    items/                   item.{router,controller,service,repository,entity}.ts
+    menu/                    menu.{router,controller,service}.ts, menu-changes.ts (snapshot + ETag,
+                             write → bump revision → publish)
+    checkout/                checkout.{router,controller,service}.ts, quote.ts (pure), money.ts
+    orders/                  order.{router,controller,service,repository,entity}.ts, order-simulator.ts
+    events/                  events.{router,controller}.ts (SSE), event-bus.ts
+    health/                  health.{router,controller}.ts
+  openapi/                   OpenAPI document generated from the Zod contracts, Swagger UI
+  seed/                      demo menu generator
+  testing/                   in-memory MongoDB app and REST helpers for integration tests
 ```
 
-Rule: routes only parse, call a service and map results; business rules live in `domain/` and are
-tested without Express or Mongo.
+Roles inside a feature:
+
+| File           | Responsibility                                                                        |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `*.router`     | URL ↔ controller method mapping, nothing else                                         |
+| `*.controller` | HTTP only: parse input with the contract schema, call the service, set status/headers |
+| `*.service`    | Business rules and orchestration; no Express, no Mongoose queries                     |
+| `*.repository` | The only place with Mongoose queries; returns entities                                |
+| `*.entity`     | Mongoose schema + document type + `toXxx` mapper to the shared DTO                    |
+
+Dependencies point one way: router → controller → service → repository → entity. A service may
+use another feature's _repository_ (for example `CategoryService` counts items through
+`ItemRepository`), never another feature's controller. Tests sit next to the code
+(`*.spec.ts`, `*.integration.spec.ts`).
 
 ---
 

@@ -1,6 +1,6 @@
 import type { Order, OrderStatus } from '@restaurant/contracts';
-import type { EventBus } from '../realtime/event-bus';
-import type { OrdersService } from '../services/orders.service';
+import type { EventBus } from '../events/event-bus';
+import type { OrderService } from './order.service';
 
 const NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   placed: 'preparing',
@@ -14,7 +14,7 @@ export interface SimulatorLogger {
 
 /**
  * Stands in for a kitchen: advances every order placed -> preparing -> ready -> completed
- * on a timer. It uses the same `OrdersService.transition` as the manual PATCH endpoint,
+ * on a timer. It uses the same `OrderService.transition` as the manual PATCH endpoint,
  * so both paths emit identical events.
  */
 export class OrderSimulator {
@@ -22,7 +22,7 @@ export class OrderSimulator {
   private stopped = false;
 
   constructor(
-    private readonly orders: OrdersService,
+    private readonly orders: OrderService,
     private readonly stepMs: number,
     private readonly logger: SimulatorLogger,
   ) {}

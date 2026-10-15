@@ -6,13 +6,14 @@ import {
   type OrderStatus,
 } from '@restaurant/contracts';
 import { Types } from 'mongoose';
-import { hashPayload } from '../domain/hash';
-import { AppError } from '../http/errors';
-import { toOrder } from '../persistence/mappers';
-import { nextCounter } from '../persistence/models/counter.model';
-import { OrderModel, type OrderDoc } from '../persistence/models/order.model';
-import type { EventBus } from '../realtime/event-bus';
-import type { CheckoutService } from './checkout.service';
+import { AppError } from '../../common/errors';
+import { hashPayload } from '../../common/hash';
+import { isDuplicateKey } from '../../common/mongo';
+import type { CounterRepository } from '../../database/counter.repository';
+import type { CheckoutService } from '../checkout/checkout.service';
+import type { EventBus } from '../events/event-bus';
+import { toOrder, type OrderDoc } from './order.entity';
+import type { OrderRepository } from './order.repository';
 
 export interface PlaceOrderResult {
   order: Order;
@@ -20,29 +21,12 @@ export interface PlaceOrderResult {
   replayed: boolean;
 }
 
-function isDuplicateKey(error: unknown): boolean {
-  return (error as { code?: number } | null)?.code === 11000;
-}
-
-function encodeCursor(doc: Pick<OrderDoc, 'createdAt' | '_id'>): string {
-  return Buffer.from(`${doc.createdAt.getTime()}_${doc._id.toHexString()}`).toString('base64url');
-}
-
-function decodeCursor(cursor: string): { createdAt: Date; id: Types.ObjectId } {
-  const [ms, id] = Buffer.from(cursor, 'base64url').toString().split('_');
-  const time = Number(ms);
-  if (!Number.isFinite(time) || !id || !Types.ObjectId.isValid(id)) {
-    throw AppError.validation('Invalid cursor', [
-      { path: ['cursor'], message: 'Malformed cursor' },
-    ]);
-  }
-  return { createdAt: new Date(time), id: new Types.ObjectId(id) };
-}
-
-export class OrdersService {
+export class OrderService {
   constructor(
-    private readonly bus: EventBus,
+    private readonly orders: OrderRepository,
+    private readonly counters: CounterRepository,
     private readonly checkout: CheckoutService,
+    private readonly bus: EventBus,
   ) {}
 
   /**
@@ -54,7 +38,7 @@ export class OrdersService {
   async place(idempotencyKey: string, request: CheckoutRequest): Promise<PlaceOrderResult> {
     const requestHash = hashPayload(request);
 
-    const existing = await OrderModel.findOne({ idempotencyKey }).lean();
+    const existing = await this.orders.findByIdempotencyKey(idempotencyKey);
     if (existing) return this.replay(existing, requestHash);
 
     const quote = await this.checkout.quote(request);
@@ -67,10 +51,9 @@ export class OrdersService {
       );
     }
 
-    const number = await nextCounter('orderNumber');
-    const now = new Date();
+    const number = await this.counters.next('orderNumber');
     try {
-      const doc = await OrderModel.create({
+      const doc = await this.orders.create({
         number,
         status: 'placed',
         lines: quote.lines.map((l) => ({
@@ -86,46 +69,33 @@ export class OrdersService {
         totalCents: quote.totalCents,
         idempotencyKey,
         requestHash,
-        statusHistory: [{ status: 'placed', at: now }],
+        statusHistory: [{ status: 'placed', at: new Date() }],
       });
-      const order = toOrder(doc.toObject());
+      const order = toOrder(doc);
       this.bus.publish({ type: 'order.created', order });
       return { order, replayed: false };
     } catch (error) {
       if (!isDuplicateKey(error)) throw error;
-      const winner = await OrderModel.findOne({ idempotencyKey }).lean();
+      const winner = await this.orders.findByIdempotencyKey(idempotencyKey);
       if (!winner) throw error;
       return this.replay(winner, requestHash);
     }
   }
 
   async get(id: string): Promise<Order> {
-    const doc = await OrderModel.findById(id).lean();
+    const doc = await this.orders.findById(id);
     if (!doc) throw AppError.notFound('Order');
     return toOrder(doc);
   }
 
   async list(limit: number, cursor?: string): Promise<OrdersPage> {
-    const filter: Record<string, unknown> = {};
-    if (cursor) {
-      const { createdAt, id } = decodeCursor(cursor);
-      filter['$or'] = [{ createdAt: { $lt: createdAt } }, { createdAt, _id: { $lt: id } }];
-    }
-    const docs = await OrderModel.find(filter)
-      .sort({ createdAt: -1, _id: -1 })
-      .limit(limit + 1)
-      .lean();
-    const page = docs.slice(0, limit);
-    const last = page[page.length - 1];
-    return {
-      items: page.map(toOrder),
-      nextCursor: docs.length > limit && last ? encodeCursor(last) : null,
-    };
+    const { docs, nextCursor } = await this.orders.findPage(limit, cursor);
+    return { items: docs.map(toOrder), nextCursor };
   }
 
   /** Moves an order to `to` if the state machine allows it; atomic against concurrent changes. */
   async transition(id: string, to: OrderStatus): Promise<Order> {
-    const current = await OrderModel.findById(id).lean();
+    const current = await this.orders.findById(id);
     if (!current) throw AppError.notFound('Order');
     if (!canTransition(current.status, to)) {
       throw new AppError(
@@ -135,11 +105,7 @@ export class OrdersService {
         { from: current.status, to },
       );
     }
-    const updated = await OrderModel.findOneAndUpdate(
-      { _id: id, status: current.status },
-      { $set: { status: to }, $push: { statusHistory: { status: to, at: new Date() } } },
-      { returnDocument: 'after' },
-    ).lean();
+    const updated = await this.orders.transitionStatus(id, current.status, to);
     if (!updated) {
       // Lost a race with another transition: re-evaluate against the fresh state.
       return this.transition(id, to);
@@ -151,10 +117,7 @@ export class OrdersService {
 
   /** Orders that still need automatic status progression (used by the simulator on boot). */
   async listActive(): Promise<Order[]> {
-    const docs = await OrderModel.find({ status: { $in: ['placed', 'preparing', 'ready'] } })
-      .sort({ createdAt: 1 })
-      .lean();
-    return docs.map(toOrder);
+    return (await this.orders.findActive()).map(toOrder);
   }
 
   private replay(existing: OrderDoc, requestHash: string): PlaceOrderResult {
