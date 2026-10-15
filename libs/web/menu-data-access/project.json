@@ -1,0 +1,13 @@
+{
+  "name": "menu-data-access",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/web/menu-data-access/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["type:data-access", "scope:web"],
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    }
+  }
+}
