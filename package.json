@@ -13,7 +13,8 @@
     "typecheck": "nx run-many -t typecheck",
     "format": "nx format:write",
     "format:check": "nx format:check",
-    "check": "nx run-many -t lint test build && nx format:check"
+    "check": "nx run-many -t lint test build && nx format:check",
+    "seed": "nx build api && node dist/apps/api/main.js --seed"
   },
   "devDependencies": {
     "@angular-devkit/core": "~22.1.0",
