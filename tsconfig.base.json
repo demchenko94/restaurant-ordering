@@ -15,7 +15,14 @@
     "skipDefaultLibCheck": true,
     "strict": true,
     "paths": {
-      "@restaurant/contracts": ["./libs/shared/contracts/src/index.ts"]
+      "@restaurant/contracts": ["./libs/shared/contracts/src/index.ts"],
+      "@restaurant/web/core": ["./libs/web/core/src/index.ts"],
+      "@restaurant/web/ui": ["./libs/web/ui/src/index.ts"],
+      "@restaurant/web/menu-data-access": ["./libs/web/menu-data-access/src/index.ts"],
+      "@restaurant/web/orders-data-access": ["./libs/web/orders-data-access/src/index.ts"],
+      "@restaurant/web/feature-setup": ["./libs/web/feature-setup/src/index.ts"],
+      "@restaurant/web/feature-orders": ["./libs/web/feature-orders/src/index.ts"],
+      "@restaurant/web/feature-ordering": ["./libs/web/feature-ordering/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
