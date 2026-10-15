@@ -1,0 +1,65 @@
+// Row layouts shared by the real lists and their loading skeletons, so a skeleton always has the
+// exact same grid and height as the rows that replace it (no layout shift when data arrives).
+// Resolved through `stylePreprocessorOptions.includePaths`: `@use 'rows';`
+
+@mixin orders-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto 84px;
+  align-items: center;
+  gap: 12px;
+  height: var(--order-row-height);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  @media (max-width: 600px) {
+    grid-template-columns: 44px minmax(0, 1fr) 72px;
+    grid-template-areas: 'n b t' 'n s s';
+  }
+}
+
+@mixin catalog-item-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 132px;
+  align-items: center;
+  gap: 12px;
+  height: var(--row-height);
+  padding: 0 8px 0 4px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  @media (max-width: 959px) {
+    grid-template-columns: minmax(0, 1fr) 72px 104px;
+    gap: 8px;
+  }
+}
+
+@mixin catalog-header-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  justify-content: start;
+  align-content: end;
+  gap: 12px;
+  height: var(--row-height);
+  padding: 0 8px 8px 4px;
+  border-bottom: 1px solid var(--mat-sys-outline);
+}
+
+/// Grid of the Setup item table (column header and rows).
+@mixin setup-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 90px 104px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px 0 16px;
+
+  @media (max-width: 800px) {
+    grid-template-columns: minmax(0, 1fr) 96px 56px 84px;
+    gap: 8px;
+    padding-left: 8px;
+  }
+}
+
+@mixin setup-row {
+  @include setup-columns;
+  height: var(--row-height);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
