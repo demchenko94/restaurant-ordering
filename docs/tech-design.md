@@ -214,7 +214,6 @@ export const ErrorCode = z.enum([
   'CART_CHANGED', // checkout: availability / price differences
   'IDEMPOTENCY_KEY_REUSED', // same key, different payload
   'INVALID_STATUS_TRANSITION',
-  'RATE_LIMITED',
   'INTERNAL',
 ]);
 
@@ -436,7 +435,6 @@ Cursor pagination on `(createdAt desc, _id desc)`: `GET /orders?limit=30&cursor=
 | 409  | `CART_CHANGED`              | `POST /orders` found differences; `details` is a `CartChange[]` |
 | 409  | `INVALID_STATUS_TRANSITION` | Illegal status move                                             |
 | 422  | `IDEMPOTENCY_KEY_REUSED`    | Same key, different body                                        |
-| 429  | `RATE_LIMITED`              | Optional basic limiter                                          |
 | 500  | `INTERNAL`                  | Anything else; message is generic, details only in logs         |
 
 `POST /checkout/quote` always answers `200` – differences are data (`changes`), not an error.

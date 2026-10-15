@@ -30,6 +30,23 @@ and the web app (`http://localhost:4200`, `/api` is proxied to the API).
 | `npm run check`      | lint + test + build + format     |
 | `npm run db:up/down` | Start / stop MongoDB             |
 
+## API
+
+- Swagger UI: <http://localhost:3333/api/docs>, spec: `/api/openapi.json` (generated from the Zod
+  contracts).
+- Health: `GET /api/health`.
+- On first start an empty database is seeded with 12 categories and 3 000 items (see
+  `.env.example` for all settings).
+- Orders advance automatically (`placed → preparing → ready → completed`, one step every 8 s,
+  `SIMULATOR_STEP_MS`); `PATCH /api/orders/:id/status` does it manually.
+
+Design and protocol documents:
+
+- [docs/tech-design.md](docs/tech-design.md) – contracts, data model, requests, checkout flow
+- [docs/ui-design.md](docs/ui-design.md) – Angular app design
+- [docs/realtime.md](docs/realtime.md) – SSE events, replay, revision rule
+- [docs/database.md](docs/database.md) – collections, indexes, invariants
+
 ## Workspace layout
 
 ```
