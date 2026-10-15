@@ -1,3 +1,4 @@
+import { SERVER_EVENT_TYPES } from './event-types';
 import { ServerEvent } from './events';
 
 describe('ServerEvent', () => {
@@ -15,5 +16,10 @@ describe('ServerEvent', () => {
     expect(ServerEvent.safeParse({ type: 'menu.item.deleted', revision: 1, id: 'x' }).success).toBe(
       false,
     );
+  });
+
+  it('lists the same event names as the schema', () => {
+    const fromSchema = ServerEvent.options.map((o) => o.shape.type.value).sort();
+    expect([...SERVER_EVENT_TYPES].sort()).toEqual(fromSchema);
   });
 });
