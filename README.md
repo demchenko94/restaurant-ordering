@@ -47,12 +47,31 @@ Design and protocol documents:
 - [docs/realtime.md](docs/realtime.md) – SSE events, replay, revision rule
 - [docs/database.md](docs/database.md) – collections, indexes, invariants
 
+## Web app
+
+Screens: **Menu** (`/menu`: virtual-scrolled catalog, search, categories, cart, checkout),
+**Orders** (`/orders`: live statuses) and **Setup** (`/setup`: categories, items, prices,
+availability, open-price flag). Anything changed in Setup, or by another browser tab, shows up in
+the Menu immediately over SSE, including prices and availability of items already in the cart.
+
+Checkout is a small state machine (`CheckoutStore`): the cart is re-validated by the server, any
+change (unavailable item, new price, discount too high) is shown and must be accepted before the
+order can be confirmed, and confirming is idempotent, so a double click or a retry after a lost
+connection can never create two orders. See [docs/ui-design.md](docs/ui-design.md).
+
 ## Workspace layout
 
 ```
-apps/web              Angular application
-apps/api              Express API
-libs/shared/contracts Zod schemas + DTO types shared by web and api
+apps/web                       Angular application shell (routes, theme, realtime wiring)
+apps/api                       Express API, flat structure by feature (see docs/tech-design.md §9)
+libs/shared/contracts          Zod schemas + DTO types shared by web and api
+libs/web/core                  HTTP resilience, errors, SSE client, connection state, reusable store features
+libs/web/ui                    Presentational components and helpers
+libs/web/menu-data-access      Menu API + MenuStore (NgRx SignalStore)
+libs/web/orders-data-access    Orders API + OrdersStore
+libs/web/feature-ordering      catalog/ cart/ checkout/  (flat files per sub-feature)
+libs/web/feature-orders        Orders list
+libs/web/feature-setup         categories/ items/  (menu configuration)
 docs/                 Assignment and (later) API / database documentation
 ```
 

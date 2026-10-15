@@ -26,20 +26,45 @@ Stack: Angular 22 (zoneless, standalone, signals) · Angular Material + CDK · N
 
 ## 2. Workspace structure
 
-Nx libraries, one responsibility each, enforced by tags in `eslint.config.mjs`.
+Nx libraries by layer (enforced by tags in `eslint.config.mjs`), and **inside each library a flat
+structure by feature**: one folder per feature or sub-feature, role-named files, no deeper nesting.
 
 ```
-apps/web                         shell: app config, routes, layout, theme
+apps/web/src/app/                 shell: config, routes, realtime wiring, toolbar, banner
 libs/web/
-  core                           HTTP interceptors, ErrorHandler, ConnectionStore, SSE client, config tokens
-  ui                             presentational: MoneyPipe, SkeletonRow, EmptyState, ErrorState, StatusChip
-  menu-data-access               MenuApi, MenuStore (entities + revision)
-  orders-data-access             OrdersApi, OrdersStore
-  feature-setup                  menu configuration screen
-  feature-menu                   catalog, cart, checkout
-  feature-orders                 orders list screen
-libs/shared/contracts            (exists) Zod schemas and types
+  core/                           cross-cutting infrastructure
+    errors/  http/  connection/  realtime/  notifications/
+    store/                        reusable SignalStore features: withRequestStatus, withStorageSync
+  ui/                             presentational components, pipes, validators (no stores, no HTTP)
+  menu-data-access/               menu domain data
+    menu.api.ts  menu.state.ts  menu.store.ts  menu.commands.ts  menu.cache.ts  menu.testing.ts
+  orders-data-access/             orders domain data
+    orders.api.ts  orders.state.ts  orders.store.ts
+  feature-ordering/               catalog + cart + checkout
+    catalog/   catalog.page, catalog-filters.component
+    cart/      cart.state, cart.view, cart.store, cart-panel.component, quantity-stepper, open-price.dialog
+    checkout/  checkout.state, checkout.store, checkout.dialog
+  feature-setup/                  menu configuration
+    setup.page
+    categories/  category-list.component, category-name.dialog
+    items/       item-list.component, item-form.dialog
+  feature-orders/                 orders list
+    orders.page, order-detail.component
+libs/shared/contracts             Zod schemas and types shared with the API
 ```
+
+File roles (same idea as the server's `router/controller/service/repository/entity`):
+
+| Suffix           | Role                                                                          |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `*.page.ts`      | Routed screen: layout and screen states (loading / error / empty), no logic   |
+| `*.component.ts` | Reusable piece of a screen; inputs/outputs, injects stores it needs           |
+| `*.dialog.ts`    | Dialog opened with `MatDialog`; loaded lazily with a dynamic `import()`       |
+| `*.store.ts`     | NgRx SignalStore: the only place that holds and changes feature state         |
+| `*.state.ts`     | State type, initial state, constants (and pure state helpers such as restore) |
+| `*.view.ts`      | Pure functions that derive view data (testable without Angular)               |
+| `*.commands.ts`  | Write operations of a store, built against a small port (see §4)              |
+| `*.api.ts`       | `HttpClient` wrapper for one backend area                                     |
 
 Tags and rules:
 
@@ -51,7 +76,7 @@ Tags and rules:
 | `type:core`        | `scope:shared`                                             |
 | `type:app`         | everything in `scope:web`                                  |
 
-Features never import each other. `feature-menu` needs the menu data → it imports
+Features never import each other. `feature-ordering` needs the menu data → it imports
 `menu-data-access`, not `feature-setup`.
 
 ---
@@ -61,7 +86,7 @@ Features never import each other. `feature-menu` needs the menu data → it impo
 | Path      | Feature            | Notes                     |
 | --------- | ------------------ | ------------------------- |
 | `/`       | redirect → `/menu` |                           |
-| `/menu`   | `feature-menu`     | catalog + cart + checkout |
+| `/menu`   | `feature-ordering` | catalog + cart + checkout |
 | `/orders` | `feature-orders`   |                           |
 | `/setup`  | `feature-setup`    |                           |
 | `**`      | not found page     |                           |
@@ -132,7 +157,7 @@ Optimistic updates: the **availability toggle** in Setup flips immediately and r
 snackbar on failure (cheap, high-frequency action). All other setup writes wait for the server
 (price edits, deletes), because validation can legitimately reject them.
 
-### 4.3 `CartStore` (feature-menu)
+### 4.3 `CartStore` (feature-ordering)
 
 State holds only user intent; names and prices are never copied:
 
@@ -168,7 +193,7 @@ interface CartLineView {
 - Merging rule: adding the same fixed-price item increments quantity; for open-price items a line is
   `(itemId, unitPriceCents)`.
 
-### 4.4 `CheckoutStore` (feature-menu)
+### 4.4 `CheckoutStore` (feature-ordering)
 
 Explicit state machine, so impossible UI states are unrepresentable:
 
@@ -213,7 +238,7 @@ resync the first page is reloaded and merged. Also sets a transient `highlighted
 `SseClient` (core) wraps `EventSource('/api/events')` in a small class, not RxJS-heavy:
 
 - Opens outside any component, started by an `APP_INITIALIZER`-style provider after first render.
-- Parses `message` events with `ServerEvent.safeParse`; invalid payloads are logged and dropped.
+- Registers a listener per event name (`SERVER_EVENT_TYPES`); frames that are not JSON or have an unknown `type` are logged and dropped. Full Zod validation is deliberately skipped here (see §7: it would put Zod into the startup bundle).
 - Native `EventSource` already reconnects and sends `Last-Event-ID`. We add:
   - state tracking (`open` → `live`, `error` → `reconnecting`);
   - exponential backoff with jitter when the browser gives up (`readyState === CLOSED`):
@@ -306,16 +331,16 @@ Two-pane layout: categories (left), items of the selected category (right).
 Targets (checked with Lighthouse mobile, throttled Slow 4G, in the README): LCP < 2.5 s,
 CLS < 0.05 (≈ 0), INP < 200 ms, initial JS < 200 kB gzip.
 
-| Concern                | Technique                                                                                                                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Initial load           | Zoneless (no zone.js), standalone, lazy routes, esbuild `application` builder, budgets in `project.json` (warn 300 kB / error 500 kB initial)                                                                                    |
-| Heavy UI               | `@defer` for dialogs, bottom sheet, cart panel on mobile; Material modules imported per component                                                                                                                                |
-| Large menu             | Virtual scroll (≈ 15 DOM rows regardless of 5 000 items); Map indices; `computed` memoization                                                                                                                                    |
-| Fast interaction       | Local-first cart; optimistic availability toggle; no spinners for local actions                                                                                                                                                  |
-| Visual stability (CLS) | Fixed row heights, skeleton rows with the same dimensions, `font-display: swap` + preloaded self-hosted font subset, reserved space for toolbar / banner (banner overlays, never pushes content)                                 |
-| Slow connection        | `GET /menu` gzip + ETag; `HttpClient` with `withFetch()`; skeletons instead of blank screens; cached last menu in `localStorage` shown immediately (stale-while-revalidate) with a "Updating…" hint                              |
-| Low-end devices        | No heavy animations (only transform / opacity), `prefers-reduced-motion`, no images in the catalog (text-first); event handlers do O(1) Map updates; batching of burst events via `queueMicrotask` / one signal update per frame |
-| SSE bursts             | Dispatcher coalesces events within one animation frame before touching stores                                                                                                                                                    |
+| Concern                | Technique                                                                                                                                                                                                                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Initial load           | Zoneless (no zone.js), standalone, lazy routes, esbuild `application` builder, budgets in `project.json` (warn 300 kB / error 500 kB initial)                                                                                                                                                                                          |
+| Heavy UI               | `@defer` for dialogs, bottom sheet, cart panel on mobile; Material modules imported per component                                                                                                                                                                                                                                      |
+| Large menu             | Virtual scroll (≈ 15 DOM rows regardless of 5 000 items); Map indices; `computed` memoization                                                                                                                                                                                                                                          |
+| Fast interaction       | Local-first cart; optimistic availability toggle; no spinners for local actions                                                                                                                                                                                                                                                        |
+| Visual stability (CLS) | Fixed row heights; per-screen skeletons (`*-skeleton.component.ts`) built from the same SCSS row mixins as the real rows (`libs/web/ui/src/styles/_rows.scss`), plus placeholder category chips; `font-display: swap` + preloaded self-hosted font subset, reserved space for toolbar / banner (banner overlays, never pushes content) |
+| Slow connection        | `GET /menu` gzip + ETag; `HttpClient` with `withFetch()`; skeletons instead of blank screens; cached last menu in `localStorage` shown immediately (stale-while-revalidate) with a "Updating…" hint                                                                                                                                    |
+| Low-end devices        | No heavy animations (only transform / opacity), `prefers-reduced-motion`, no images in the catalog (text-first); event handlers do O(1) Map updates; batching of burst events via `queueMicrotask` / one signal update per frame                                                                                                       |
+| SSE bursts             | Dispatcher coalesces events within one animation frame before touching stores                                                                                                                                                                                                                                                          |
 
 Stale menu cache: stored as `{revision, snapshot}`; on boot the store hydrates from it, then calls
 `load()` which short-circuits on `304`. Cache is dropped if schema validation fails.
@@ -420,3 +445,47 @@ Each step is a small commit set (feature + tests) to keep the history meaningful
    (default: yes, English only)
 4. Should the cart survive a browser restart (`localStorage`) or be session-only?
    (default: survives restart)
+
+---
+
+## 14. Implementation notes (what differs from the design above)
+
+- **Zod stays out of the startup bundle.** `@restaurant/contracts` is marked `sideEffects: false`
+  and the code that runs at startup (SSE client, error mapping, menu cache, cart restore) uses
+  small structural checks instead of Zod schemas. Zod is only loaded by the Setup screen (forms).
+  Result: initial JS ≈ 103 kB gzip (376 kB raw); budgets are 650 kB warning / 1 MB error raw.
+- **Snackbar is lazy.** `NotifyService` imports Angular Material's snack bar on first use.
+- **Material Icons are self-hosted** (`@fontsource/material-icons`), no request to Google Fonts.
+- **Orders detail** is a panel below the virtual list (as designed); status is display-only, the
+  server simulator advances it.
+- **Timeouts use `timeout({ each })`**, not `first`: real HTTP backends emit a `Sent` event
+  immediately, which would cancel a `first` timer.
+- **Stale cache** of the menu is validated structurally (key `restaurant.menu.v1`); bump the key
+  when the snapshot shape changes.
+- Cart persists in `localStorage` (`restaurant.cart.v1`) and is sanitized on read.
+
+---
+
+## 15. Store conventions (NgRx SignalStore)
+
+- **One store per domain or feature**, `providedIn: 'root'`; components never `patchState`, they
+  call store methods. Cross-store reads go through public signals (the cart joins the menu).
+- **Reusable `signalStoreFeature`s live in `core/store`**: `withRequestStatus()` (loading / ready /
+  error with stale-while-revalidate semantics) and `withStorageSync()` (restore + persist with an
+  untrusted-input `restore` function). Menu and orders share the first, the cart uses the second.
+- **Files split by concern**: `*.state.ts` (types, initial state), `*.store.ts` (composition:
+  state → computed → methods → hooks), `*.view.ts` (pure derivations), `*.commands.ts` (writes).
+- **Async the idiomatic way**: reads and workflows are `rxMethod`s with the operator that states
+  the intent: `switchMap` (latest wins: menu load, quote), `exhaustMap` (ignore repeats: confirm
+  order, load more). Results are applied with `tapResponse` from `@ngrx/operators`.
+  Commands that a form must await (create/update/delete) are `async` methods rejecting with an
+  `ApiErrorView`.
+- **Writes through a port**: `createMenuCommands(api, port)` depends on a tiny interface instead
+  of the generated store type. (A typed-input `signalStoreFeature` for commands did not compile with
+  TypeScript 6 + `providedIn`, and a port is easier to test anyway.)
+- **Derived state is `computed`, never copied**: cart lines are joined with live menu items;
+  `CartLineView` is produced by the pure `toCartLineView`.
+- **Tests** use `unprotected(store)` from `@ngrx/signals/testing` to set up state, and fake API
+  ports; no `as never` casts.
+- **Not used (deliberately)**: the NgRx Events plugin. Live events are routed in one place
+  (`apps/web/src/app/realtime.ts`), which is simple enough without an event bus.
