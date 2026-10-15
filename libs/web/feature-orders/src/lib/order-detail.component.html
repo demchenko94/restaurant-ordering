@@ -1,0 +1,31 @@
+<section aria-label="Order details">
+  <header>
+    <h2>Order #{{ order().number }}</h2>
+    <app-status-chip [status]="order().status" />
+  </header>
+  <ul>
+    @for (line of order().lines; track $index) {
+      <li>
+        <span>{{ line.quantity }}× {{ line.name }}</span>
+        <span class="muted">{{ line.categoryName }}</span>
+        <span class="amount">{{ line.unitPriceCents * line.quantity | money }}</span>
+      </li>
+    }
+  </ul>
+  <dl>
+    <div>
+      <dt>Subtotal</dt>
+      <dd>{{ order().subtotalCents | money }}</dd>
+    </div>
+    @if (order().discountCents > 0) {
+      <div>
+        <dt>Discount</dt>
+        <dd>−{{ order().discountCents | money }}</dd>
+      </div>
+    }
+    <div class="grand">
+      <dt>Total</dt>
+      <dd>{{ order().totalCents | money }}</dd>
+    </div>
+  </dl>
+</section>

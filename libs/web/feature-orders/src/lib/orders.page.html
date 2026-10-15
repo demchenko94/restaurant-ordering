@@ -1,0 +1,57 @@
+<div class="page">
+  <header class="header">
+    <h1>Orders</h1>
+    <span class="muted" aria-live="polite">Statuses update live</span>
+  </header>
+
+  @switch (orders.status()) { @case ('loading') {
+  <app-orders-skeleton />
+  } @case ('error') {
+  <app-error-state
+    [title]="errorTitle()"
+    [reference]="orders.error()?.requestId"
+    (retry)="retry()"
+  />
+  } @default { @if (orders.sorted().length === 0) {
+  <app-empty-state
+    icon="receipt_long"
+    title="No orders yet"
+    hint="Orders you place will show up here."
+  >
+    <a mat-flat-button routerLink="/menu">Browse the menu</a>
+  </app-empty-state>
+  } @else {
+  <cdk-virtual-scroll-viewport
+    itemSize="72"
+    minBufferPx="720"
+    maxBufferPx="1440"
+    class="viewport"
+    (scrolledIndexChange)="onScrolled()"
+  >
+    <button
+      *cdkVirtualFor="let order of orders.sorted(); trackBy: trackOrder"
+      type="button"
+      class="row"
+      [class.flash]="highlighted().has(order.id)"
+      [class.open]="selected()?.id === order.id"
+      [attr.aria-expanded]="selected()?.id === order.id"
+      (click)="select(order)"
+    >
+      <span class="number">#{{ order.number }}</span>
+      <span class="body">
+        <span class="summary">{{ summary(order) }}</span>
+        <span class="muted"
+          >{{ order.createdAt | date: 'MMM d, HH:mm' }} · {{ itemCount(order) }} items</span
+        >
+      </span>
+      <app-status-chip [status]="order.status" />
+      <span class="total">{{ order.totalCents | money }}</span>
+    </button>
+    @if (orders.loadingMore()) {
+    <div class="more"><mat-spinner diameter="24" aria-label="Loading more orders" /></div>
+    }
+  </cdk-virtual-scroll-viewport>
+  } @if (selected(); as order) {
+  <app-order-detail [order]="order" />
+  } } }
+</div>

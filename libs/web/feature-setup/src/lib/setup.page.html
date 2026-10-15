@@ -1,0 +1,29 @@
+<div class="page">
+  @switch (menu.status()) { @case ('loading') {
+  <div class="layout">
+    <app-category-list-skeleton />
+    <section class="items"><app-item-list-skeleton /></section>
+  </div>
+  } @case ('error') {
+  <app-error-state [title]="errorTitle()" [reference]="menu.error()?.requestId" (retry)="retry()" />
+  } @default {
+  <div class="layout">
+    <app-category-list
+      aria-label="Categories"
+      [selectedId]="selectedId()"
+      (selectedIdChange)="picked.set($event)"
+    />
+    <section class="items" aria-label="Items">
+      @if (selected(); as category) {
+      <app-item-list [category]="category" />
+      } @else {
+      <app-empty-state
+        icon="category"
+        title="No categories yet"
+        hint="Add a category to start building the menu."
+      />
+      }
+    </section>
+  </div>
+  } }
+</div>

@@ -1,0 +1,44 @@
+<form class="add-category" (ngSubmit)="add()">
+  <input
+    class="text-input"
+    type="text"
+    placeholder="New category"
+    aria-label="New category name"
+    maxlength="60"
+    autocomplete="off"
+    [formControl]="newCategory"
+  />
+  <button mat-flat-button type="submit" [disabled]="newCategory.invalid || adding()">Add</button>
+</form>
+
+<ul class="category-list">
+  @for (category of menu.categoriesSorted(); track category.id) {
+    <li [class.selected]="category.id === selectedId()">
+      <button
+        type="button"
+        class="category-pick"
+        (click)="selectedId.set(category.id)"
+        [attr.aria-pressed]="category.id === selectedId()"
+      >
+        <span class="name">{{ category.name }}</span>
+        <span class="count">{{ countIn(category.id) }}</span>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        (click)="rename(category)"
+        [attr.aria-label]="'Rename ' + category.name"
+      >
+        <mat-icon>edit</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        type="button"
+        (click)="remove(category)"
+        [attr.aria-label]="'Delete ' + category.name"
+      >
+        <mat-icon>delete</mat-icon>
+      </button>
+    </li>
+  }
+</ul>

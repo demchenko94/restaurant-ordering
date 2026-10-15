@@ -1,0 +1,75 @@
+<header class="items-header">
+  <h1>{{ category().name }}</h1>
+  <span class="muted">{{ items().length }} items</span>
+  <span class="spacer"></span>
+  <button mat-flat-button type="button" (click)="openForm()">
+    <mat-icon>add</mat-icon> Add item
+  </button>
+</header>
+
+@if (items().length === 0) {
+  <app-empty-state
+    icon="restaurant_menu"
+    title="This category is empty"
+    hint="Add the first item."
+  />
+} @else {
+  <div class="columns" aria-hidden="true">
+    <span>Item</span><span class="col-price">Price</span><span class="col-available">Available</span
+    ><span class="col-actions"></span>
+  </div>
+  <cdk-virtual-scroll-viewport itemSize="64" minBufferPx="640" maxBufferPx="1280" class="viewport">
+    <div
+      *cdkVirtualFor="let item of items(); trackBy: trackItem"
+      class="row"
+      [class.unavailable]="!item.available"
+    >
+      <div class="cell-name">
+        <span class="item-name">{{ item.name }}</span>
+        @if (item.description) {
+          <span class="muted ellipsis">{{ item.description }}</span>
+        }
+      </div>
+      <div class="col-price">
+        @if (item.openPrice) {
+          <span class="chip">Open price</span>
+        } @else {
+          <input
+            #price
+            class="text-input price-input"
+            inputmode="decimal"
+            [value]="priceText(item.priceCents)"
+            [attr.aria-label]="'Price of ' + item.name"
+            (keydown.enter)="price.blur()"
+            (blur)="commitPrice(item, price)"
+          />
+        }
+      </div>
+      <div class="col-available">
+        <mat-slide-toggle
+          [checked]="item.available"
+          [attr.aria-label]="'Available: ' + item.name"
+          (change)="toggleAvailable(item, $event.checked)"
+        />
+      </div>
+      <div class="col-actions">
+        <button
+          mat-icon-button
+          type="button"
+          (click)="openForm(item)"
+          [attr.aria-label]="'Edit ' + item.name"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button
+          mat-icon-button
+          type="button"
+          (click)="remove(item)"
+          [attr.aria-label]="'Delete ' + item.name"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </div>
+    </div>
+  </cdk-virtual-scroll-viewport>
+}

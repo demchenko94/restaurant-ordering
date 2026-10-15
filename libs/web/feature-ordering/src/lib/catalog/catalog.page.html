@@ -1,0 +1,124 @@
+<div class="page">
+  <section class="catalog" aria-label="Menu">
+    <app-catalog-filters
+      [categories]="menu.categoriesSorted()"
+      [loading]="menu.status() === 'loading'"
+      [selectedId]="selectedCategoryId()"
+      [query]="query()"
+      (queryChange)="onQueryChange($event)"
+      (categorySelected)="selectCategory($event)"
+    />
+
+    @switch (menu.status()) { @case ('loading') {
+    <app-catalog-skeleton />
+    } @case ('error') {
+    <app-error-state
+      [title]="errorTitle()"
+      [reference]="menu.error()?.requestId"
+      (retry)="retry()"
+    />
+    } @default { @if (menu.isEmpty()) {
+    <app-empty-state
+      icon="restaurant_menu"
+      title="The menu is empty"
+      hint="Add categories and items on the Setup page."
+    />
+    } @else if (rows().length === 0) {
+    <app-empty-state
+      icon="search_off"
+      title="Nothing matches"
+      hint="Try a different search or category."
+    >
+      <button mat-stroked-button type="button" (click)="clearFilters()">Clear filters</button>
+    </app-empty-state>
+    } @else {
+    <cdk-virtual-scroll-viewport
+      itemSize="64"
+      minBufferPx="640"
+      maxBufferPx="1280"
+      class="viewport"
+      role="list"
+    >
+      <div
+        *cdkVirtualFor="
+                let row of rows();
+                trackBy: trackRow;
+                let i = index;
+                let count = count
+              "
+        [attr.role]="'listitem'"
+        [attr.aria-posinset]="i + 1"
+        [attr.aria-setsize]="count"
+        [class]="row.kind === 'header' ? 'row header' : 'row item'"
+      >
+        @if (row.kind === 'header') {
+        <h2>{{ row.name }}</h2>
+        <span class="muted">{{ row.count }}</span>
+        } @else {
+        <div class="info" [class.unavailable]="!row.item.available">
+          <span class="name">{{ row.item.name }}</span>
+          @if (row.item.description) {
+          <span class="muted ellipsis">{{ row.item.description }}</span>
+          }
+        </div>
+        <div class="price" [class.unavailable]="!row.item.available">
+          @if (row.item.openPrice) {
+          <span class="open-tag">Open price</span>
+          } @else { {{ row.item.priceCents | money }} }
+        </div>
+        <div class="action">
+          @if (!row.item.available) {
+          <span class="soldout"><mat-icon aria-hidden="true">block</mat-icon> Unavailable</span>
+          } @else if (row.item.openPrice) {
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="addOpenPrice(row.item)"
+            [attr.aria-label]="'Add ' + row.item.name + ' with a price'"
+          >
+            Add
+          </button>
+          } @else if (quantityOf(row.item.id) > 0) {
+          <app-quantity-stepper
+            [value]="quantityOf(row.item.id)"
+            [label]="row.item.name"
+            (changed)="cart.setQuantity(row.item.id, $event)"
+          />
+          } @else {
+          <button
+            mat-flat-button
+            type="button"
+            (click)="addFixed(row.item)"
+            [attr.aria-label]="'Add ' + row.item.name"
+          >
+            Add
+          </button>
+          }
+        </div>
+        }
+      </div>
+    </cdk-virtual-scroll-viewport>
+    } } }
+  </section>
+
+  @if (isWide()) {
+  <aside class="cart" aria-label="Order">
+    @defer {
+    <app-cart-panel />
+    } @placeholder {
+    <div class="cart-placeholder"></div>
+    }
+  </aside>
+  } @else {
+  <button
+    type="button"
+    class="cart-bar"
+    (click)="openCart()"
+    [attr.aria-label]="'View order, ' + cart.count() + ' items'"
+  >
+    <mat-icon aria-hidden="true">shopping_cart</mat-icon>
+    <span>Your order</span>
+    <span class="badge">{{ cart.count() }}</span>
+  </button>
+  }
+</div>

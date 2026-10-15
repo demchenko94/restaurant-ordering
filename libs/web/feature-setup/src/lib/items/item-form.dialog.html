@@ -1,0 +1,68 @@
+<h2 mat-dialog-title>{{ editing ? 'Edit item' : 'New item' }}</h2>
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <mat-dialog-content>
+    <mat-form-field appearance="outline">
+      <mat-label>Name</mat-label>
+      <input
+        matInput
+        formControlName="name"
+        [maxlength]="nameMax"
+        autocomplete="off"
+        cdkFocusInitial
+      />
+      @if (form.controls.name.hasError('server')) {
+      <mat-error>{{ form.controls.name.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Description (optional)</mat-label>
+      <input
+        matInput
+        formControlName="description"
+        [maxlength]="descriptionMax"
+        autocomplete="off"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Category</mat-label>
+      <mat-select formControlName="categoryId">
+        @for (category of categories(); track category.id) {
+        <mat-option [value]="category.id">{{ category.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-checkbox formControlName="openPrice"
+      >Open price (entered when added to an order)</mat-checkbox
+    >
+
+    <mat-form-field appearance="outline">
+      <mat-label>Price</mat-label>
+      <span matTextPrefix>$&nbsp;</span>
+      <input matInput formControlName="price" inputmode="decimal" autocomplete="off" />
+      @if (priceDisabled()) {
+      <mat-hint>Not used for open-price items</mat-hint>
+      } @if ( form.controls.price.touched && (form.controls.price.hasError('price') ||
+      form.controls.price.hasError('server')) ) {
+      <mat-error
+        >{{ form.controls.price.getError('price') ?? form.controls.price.getError('server')
+        }}</mat-error
+      >
+      }
+    </mat-form-field>
+
+    <mat-slide-toggle formControlName="available">Available for ordering</mat-slide-toggle>
+
+    @if (formError(); as message) {
+    <p class="form-error" role="alert">{{ message }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close [disabled]="saving()">Cancel</button>
+    <button mat-flat-button type="submit" [disabled]="saving() || form.invalid">
+      {{ saving() ? 'Saving…' : 'Save' }}
+    </button>
+  </mat-dialog-actions>
+</form>

@@ -1,0 +1,127 @@
+<section class="cart" aria-labelledby="cart-title">
+  <header>
+    <h2 id="cart-title">Your order</h2>
+    @if (!cart.isEmpty()) {
+      <button mat-button type="button" (click)="cart.clear()">Clear</button>
+    }
+  </header>
+
+  @if (cart.isEmpty()) {
+    <p class="empty">Add items from the menu to start an order.</p>
+  } @else {
+    @if (cart.hasUnavailable() || cart.hasPriceChanges()) {
+      <div class="notice" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <div class="notice-body">
+          @if (cart.hasUnavailable()) {
+            <span>Some items are no longer available.</span>
+            <button mat-button type="button" (click)="cart.removeUnavailable()">Remove them</button>
+          }
+          @if (cart.hasPriceChanges()) {
+            <span>Some prices changed.</span>
+            <button mat-button type="button" (click)="cart.acknowledgePrices()">
+              Accept new prices
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <ul class="lines">
+      @for (view of cart.views(); track view.line.key) {
+        <li [class.bad]="view.status === 'unavailable' || view.status === 'removed'">
+          <div class="line-main">
+            <span class="name">{{ view.item?.name ?? 'Unknown item' }}</span>
+            <span class="meta">
+              @if (view.unitPriceCents !== null) {
+                {{ view.unitPriceCents | money }}
+              }
+              @if (view.item?.openPrice) {
+                <span class="tag">open price</span>
+              }
+              @if (view.status === 'price-changed') {
+                <span class="old">{{ view.line.seenPriceCents | money }}</span>
+              }
+            </span>
+            @if (statusNote(view); as note) {
+              <span class="note" [class.warn]="view.status !== 'price-changed'">{{ note }}</span>
+            }
+          </div>
+          @if (view.status === 'unavailable' || view.status === 'removed') {
+            <button
+              mat-icon-button
+              type="button"
+              (click)="cart.remove(view.line.key)"
+              [attr.aria-label]="'Remove ' + (view.item?.name ?? 'item')"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          } @else {
+            <app-quantity-stepper
+              [value]="view.line.quantity"
+              [label]="view.item?.name ?? 'item'"
+              (changed)="cart.setQuantity(view.line.key, $event)"
+            />
+            <span class="line-total">{{ view.lineTotalCents | money }}</span>
+          }
+        </li>
+      }
+    </ul>
+
+    <div class="discount">
+      <label for="discount">Discount</label>
+      <div class="discount-field">
+        <span aria-hidden="true">$</span>
+        <input
+          id="discount"
+          class="text-input"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="0.00"
+          [formControl]="discount"
+          [attr.aria-invalid]="!!cart.discountError() || discountInvalid()"
+          aria-describedby="discount-error"
+          (blur)="commitDiscount()"
+          (keydown.enter)="commitDiscount()"
+        />
+      </div>
+      <p id="discount-error" class="error" role="alert">
+        @if (discountInvalid()) {
+          Enter an amount like 2.50
+        } @else if (cart.discountError(); as message) {
+          {{ message }}
+        }
+      </p>
+    </div>
+
+    <dl class="totals">
+      <div>
+        <dt>Subtotal</dt>
+        <dd>{{ cart.subtotalCents() | money }}</dd>
+      </div>
+      @if (cart.discountCents() > 0) {
+        <div>
+          <dt>Discount</dt>
+          <dd>−{{ cart.discountCents() | money }}</dd>
+        </div>
+      }
+      <div class="total">
+        <dt>Total</dt>
+        <dd>{{ cart.totalCents() | money }}</dd>
+      </div>
+    </dl>
+
+    @if (offline()) {
+      <p class="error" role="status">You're offline — checkout is unavailable.</p>
+    }
+    <button
+      mat-flat-button
+      class="checkout"
+      type="button"
+      [disabled]="!canCheckout()"
+      (click)="startCheckout()"
+    >
+      Checkout
+    </button>
+  }
+</section>

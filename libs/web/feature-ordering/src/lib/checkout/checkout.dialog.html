@@ -1,0 +1,123 @@
+<h2 mat-dialog-title>
+  @switch (checkout.phase()) { @case ('placed') { Order placed } @case ('unknown') { We couldn't
+  confirm your order } @default { Review your order } }
+</h2>
+
+<mat-dialog-content>
+  @switch (checkout.phase()) { @case ('quoting') {
+  <app-skeleton-rows [count]="3" [rowHeight]="48" />
+  <p class="muted" role="status">Checking availability and prices…</p>
+  } @case ('failed') {
+  <div class="problem" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    <div>
+      <strong>{{ errorView()?.title }}</strong>
+      @if (errorView()?.reference; as reference) {
+      <p class="muted">Reference: {{ reference }}</p>
+      }
+    </div>
+  </div>
+  } @case ('unknown') {
+  <div class="problem" role="alert">
+    <mat-icon aria-hidden="true">cloud_off</mat-icon>
+    <div>
+      <strong>We didn't get an answer from the server.</strong>
+      <p>
+        Your order may or may not have been placed. Retrying is safe: if it already exists, we'll
+        show it instead of creating a second one.
+      </p>
+    </div>
+  </div>
+  } @case ('placed') {
+  <div class="success" role="status">
+    <mat-icon aria-hidden="true">check_circle</mat-icon>
+    <div>
+      <strong>Order #{{ checkout.order()?.number }}</strong>
+      <p>
+        Total {{ checkout.order()?.totalCents | money }}. You can follow its status on the Orders
+        page.
+      </p>
+    </div>
+  </div>
+  } @default { @if (checkout.changes().length > 0) {
+  <div class="changes" role="alert">
+    <strong><mat-icon aria-hidden="true">info</mat-icon> Some things changed</strong>
+    <ul>
+      @for (change of checkout.changes(); track $index) {
+      <li>{{ describe(change) }}</li>
+      }
+    </ul>
+    <div class="change-actions">
+      @if (hasUnavailable()) {
+      <button mat-stroked-button type="button" (click)="removeUnavailable()">
+        Remove unavailable
+      </button>
+      } @if (hasPriceChange()) {
+      <button mat-stroked-button type="button" (click)="acceptPrices()">Accept new prices</button>
+      } @if (discountCap() !== null) {
+      <button mat-stroked-button type="button" (click)="capDiscount()">Reduce discount</button>
+      }
+    </div>
+  </div>
+  } @if (checkout.quote(); as quote) {
+  <ul class="lines" [class.refreshing]="checkout.refreshing()">
+    @for (line of quote.lines; track line.itemId + ':' + line.unitPriceCents) {
+    <li>
+      <span class="qty">{{ line.quantity }}×</span>
+      <span class="name">{{ line.name }}</span>
+      <span class="unit">{{ line.unitPriceCents | money }}</span>
+      <span class="total">{{ line.lineTotalCents | money }}</span>
+    </li>
+    }
+  </ul>
+  <dl class="totals">
+    <div>
+      <dt>Subtotal</dt>
+      <dd>{{ quote.subtotalCents | money }}</dd>
+    </div>
+    @if (quote.discountCents > 0) {
+    <div>
+      <dt>Discount</dt>
+      <dd>−{{ quote.discountCents | money }}</dd>
+    </div>
+    }
+    <div class="grand">
+      <dt>Total</dt>
+      <dd>{{ quote.totalCents | money }}</dd>
+    </div>
+  </dl>
+  <p class="muted live" role="status" aria-live="polite">
+    @if (checkout.refreshing()) { Menu changed — updating prices… }
+  </p>
+  } } }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @switch (checkout.phase()) { @case ('placed') {
+  <button mat-button type="button" mat-dialog-close>Close</button>
+  <a mat-flat-button routerLink="/orders" mat-dialog-close>View orders</a>
+  } @case ('unknown') {
+  <button mat-button type="button" mat-dialog-close>Close</button>
+  <button mat-flat-button type="button" (click)="checkout.retryConfirm()">Retry</button>
+  } @case ('failed') {
+  <button mat-button type="button" mat-dialog-close>Close</button>
+  <button mat-flat-button type="button" (click)="checkout.restart()">Try again</button>
+  } @case ('confirming') {
+  <button mat-button type="button" disabled>Back to order</button>
+  <button mat-flat-button type="button" disabled>
+    <mat-spinner diameter="18" aria-label="Placing order" /> Placing order…
+  </button>
+  } @case ('quoting') {
+  <button mat-button type="button" mat-dialog-close>Cancel</button>
+  } @default {
+  <button mat-button type="button" mat-dialog-close>Back to order</button>
+  <button
+    mat-flat-button
+    type="button"
+    [disabled]="!checkout.canConfirm()"
+    (click)="checkout.confirm()"
+  >
+    Confirm order · {{ checkout.quote()?.totalCents | money }}
+  </button>
+  } }
+</mat-dialog-actions>

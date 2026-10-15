@@ -1,0 +1,18 @@
+mat-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: min(420px, 80vw);
+  padding-top: 8px;
+}
+
+mat-checkbox,
+mat-slide-toggle {
+  margin-bottom: 12px;
+}
+
+.form-error {
+  margin: 0;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-medium);
+}
